@@ -5,6 +5,7 @@ require 'pact_broker/logging'
 require 'pact_broker/pacts/database_model'
 require 'pact_broker/pacts/all_pacts'
 require 'pact_broker/pacts/latest_pacts'
+require 'pact_broker/pacts/latest_tagged_pacts'
 require 'pact/shared/json_differ'
 
 module PactBroker
@@ -37,13 +38,21 @@ module PactBroker
         DatabaseModel.where(id: id).delete
       end
 
-      def find_all_pacts_between consumer_name, options
+      def find_all_pact_versions_between consumer_name, options
         AllPacts
           .eager(:tags)
           .consumer(consumer_name)
           .provider(options.fetch(:and))
           .reverse_order(:consumer_version_order)
           .collect(&:to_domain)
+      end
+
+      def find_latest_pact_versions_for_provider provider_name, tag = nil
+        if tag
+          LatestTaggedPacts.provider(provider_name).where(tag_name: tag).collect(&:to_domain)
+        else
+          LatestPacts.provider(provider_name).collect(&:to_domain)
+        end
       end
 
       def find_by_version_and_provider version_id, provider_id
@@ -54,7 +63,7 @@ module PactBroker
       end
 
       def find_latest_pacts
-        LatestPacts.collect(&:to_domain)
+        LatestPacts.collect(&:to_domain_without_tags)
       end
 
       def find_latest_pact(consumer_name, provider_name, tag = nil)
